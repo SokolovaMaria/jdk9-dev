@@ -1,10 +1,12 @@
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -21,14 +23,25 @@
  * questions.
  */
 
-// key: compiler.warn.synthetic.name.conflict
-// options: -XDwarnOnSyntheticConflicts
+#include <jni.h>
+#include <string.h>
 
-class WarnSyntheticNameConflict {
+#include "net_util.h"
 
-    static class Outer {
-        WarnSyntheticNameConflict this$0 = null;
-    }
+JNIEXPORT jboolean JNICALL
+Java_java_net_AbstractPlainSocketImpl_isReusePortAvailable0(JNIEnv* env, jclass c1)
+{
+    return (reuseport_available()) ? JNI_TRUE : JNI_FALSE;
+}
 
-    public class Inner extends Outer { }
+JNIEXPORT jboolean JNICALL
+Java_java_net_AbstractPlainDatagramSocketImpl_isReusePortAvailable0(JNIEnv* env, jclass c1)
+{
+    return (reuseport_available()) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_jdk_net_Sockets_isReusePortAvailable0(JNIEnv* env, jclass c1)
+{
+    return (reuseport_available()) ? JNI_TRUE : JNI_FALSE;
 }
