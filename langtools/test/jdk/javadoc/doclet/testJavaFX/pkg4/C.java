@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,30 +21,25 @@
  * questions.
  */
 
-/*
- * @test
- * @summary Test of diagnostic command GC.heap_dump -all=true
- * @library /testlibrary
- * @library /test/lib/share/classes
- * @modules java.base/sun.misc
- *          java.compiler
- *          java.management
- *          jdk.jvmstat/sun.jvmstat.monitor
- * @build jdk.test.lib.*
- * @build jdk.test.lib.dcmd.*
- * @build jdk.test.lib.hprof.*
- * @build jdk.test.lib.hprof.model.*
- * @build jdk.test.lib.hprof.parser.*
- * @build jdk.test.lib.hprof.util.*
- * @build HeapDumpTest
- * @run testng HeapDumpAllTest
- */
-public class HeapDumpAllTest extends HeapDumpTest {
-    public HeapDumpAllTest() {
-        super();
-        heapDumpArgs = "-all=true";
-    }
+package pkg4;
 
-    /* See HeapDumpTest for test cases */
+public class C {
+
+    /**
+     * Defines the number of cycles in this animation. The {@code cycleCount}
+     * may be {@code INDEFINITE} for animations that repeat indefinitely.
+     * Now we add a > to deliberately cause an Html error.
+     * @defaultValue 11
+     * @since JavaFX 8.0
+     */
+    public DoubleProperty rate;
+
+    public final void setRate(double value) {}
+
+    public final double getRate() {return 2.0d;}
+
+    public final DoubleProperty rateProperty() {return new DoubleProperty();}
+
+    class DoubleProperty {}
+
 }
-
