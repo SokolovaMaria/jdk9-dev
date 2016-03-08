@@ -23,48 +23,9 @@
 
 /*
  * @test
- * @bug 8087104
- * @summary Make sure that clone() method is not called from DateFormatSymbols constructor.
- */
-import java.text.DateFormatSymbols;
+ * bug 8139474
+ * @summary -release 7 -verbose causes Javac exception
+ * @compile -release 7 -verbose DashRelease7DashVerboseTest.java
+*/
 
-public class DFSymbolsCloneTest extends DateFormatSymbols {
-
-    private Foo foo;
-
-    public DFSymbolsCloneTest(Foo fooObj) {
-        if (fooObj == null) {
-            this.foo = new Foo();
-        } else {
-            this.foo = fooObj;
-        }
-    }
-
-    @Override
-    public Object clone() {
-        DFSymbolsCloneTest dfsclone = (DFSymbolsCloneTest) super.clone();
-        if (this.foo == null) {
-            throw new RuntimeException("Clone method should not be called from "
-                    + " Superclass(DateFormatSymbols) Constructor...");
-        } else {
-            dfsclone.foo = (Foo) this.foo.clone();
-        }
-        return dfsclone;
-    }
-
-    public static void main(String[] args) {
-        DFSymbolsCloneTest dfsctest = new DFSymbolsCloneTest(new Foo());
-    }
-}
-
-class Foo {
-
-    public Foo() {
-    }
-
-    @Override
-    protected Object clone() {
-        return new Foo();
-    }
-
-}
+public class DashRelease7DashVerboseTest {}
