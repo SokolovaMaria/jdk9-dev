@@ -1,10 +1,12 @@
 /*
- * Copyright (c) 1997, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -19,34 +21,12 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
+package sun.net.httpclient.hpack;
 
-#ifndef SHARE_VM_UTILITIES_TOP_HPP
-#define SHARE_VM_UTILITIES_TOP_HPP
+final class LiteralWriter extends IndexNameValueWriter {
 
-#include "oops/oopsHierarchy.hpp"
-#include "runtime/globals.hpp"
-#include "utilities/debug.hpp"
-#include "utilities/exceptions.hpp"
-#include "utilities/globalDefinitions.hpp"
-#include "utilities/macros.hpp"
-#include "utilities/ostream.hpp"
-#include "utilities/sizes.hpp"
-#if INCLUDE_ALL_GCS
-#include "gc/g1/g1_globals.hpp"
-#endif // INCLUDE_ALL_GCS
-#ifdef COMPILER1
-#include "c1/c1_globals.hpp"
-#endif
-#ifdef COMPILER2
-#include "opto/c2_globals.hpp"
-#endif
-#if INCLUDE_JVMCI
-#include "jvmci/jvmci_globals.hpp"
-#endif
-
-// THIS FILE IS INTESIONALLY LEFT EMPTY
-// IT IS USED TO MINIMIZE THE NUMBER OF DEPENDENCIES IN includeDB
-
-#endif // SHARE_VM_UTILITIES_TOP_HPP
+    LiteralWriter() {
+        super(0b0000_0000, 4);
+    }
+}
