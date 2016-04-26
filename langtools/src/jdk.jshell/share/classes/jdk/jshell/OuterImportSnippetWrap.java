@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,23 +23,39 @@
  * questions.
  */
 
-package com.sun.tools.sjavac.server;
+package jdk.jshell;
 
-import com.sun.tools.javac.main.Main.Result;
-
-import java.io.Writer;
-
+import java.util.IdentityHashMap;
+import java.util.List;
+import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 
 /**
- * Interface of the SjavacImpl, the sjavac client and all wrappers such as
- * PooledSjavac etc.
- *
- *  <p><b>This is NOT part of any supported API.
- *  If you write code that depends on this, you do so at your own risk.
- *  This code and its internal interfaces are subject to change or
- *  deletion without notice.</b>
+ * The outer wrap for a set of snippets wrapped in a generated class
+ * @author Robert Field
  */
-public interface Sjavac {
-    Result compile(String[] args);
-    void shutdown();
+public class OuterImportSnippetWrap extends OuterWrap {
+
+    private final Snippet snippet;
+
+    OuterImportSnippetWrap(Wrap wrap, Snippet snippet) {
+        super(wrap);
+        this.snippet = snippet;
+    }
+
+    @Override
+    Diag wrapDiag(Diagnostic<? extends JavaFileObject> d) {
+        return new WrappedDiagnostic(d) {
+
+            @Override
+            Snippet snippetOrNull() {
+                return snippet;
+            }
+        };
+    }
+
+    @Override
+    public String toString() {
+        return "OISW(" + w + ")";
+    }
 }
