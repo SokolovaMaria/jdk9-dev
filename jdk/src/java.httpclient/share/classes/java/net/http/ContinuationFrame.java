@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2001, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -20,17 +20,40 @@
  *
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
- * questions.
  */
 
-#ifndef _VDrawingArea_h_
-#define _VDrawingArea_h_
+package java.net.http;
 
-#ifndef HEADLESS
-extern WidgetClass vDrawingAreaClass;
+import java.io.IOException;
 
-typedef struct _VDrawingAreaClassRec    *VDrawingAreaWidgetClass;
-typedef struct _VDrawingAreaRec         *VDrawingAreaWidget;
-#endif /* !HEADLESS */
+class ContinuationFrame extends HeaderFrame {
 
-#endif /* !_VDrawingArea_h_ */
+    public static final int TYPE = 0x9;
+
+    ContinuationFrame() {
+        type = TYPE;
+    }
+
+    @Override
+    void readIncomingImpl(ByteBufferConsumer bc) throws IOException {
+        headerBlocks = bc.getBuffers(length);
+    }
+
+    @Override
+    void writeOutgoing(ByteBufferGenerator bg) {
+        super.writeOutgoing(bg);
+        for (int i=0; i<headerBlocks.length; i++) {
+            bg.addByteBuffer(headerBlocks[i]);
+        }
+    }
+
+    @Override
+    public boolean endHeaders() {
+        return getFlag(END_HEADERS);
+    }
+
+    @Override
+    void computeLength() {
+        length = headerLength;
+    }
+}

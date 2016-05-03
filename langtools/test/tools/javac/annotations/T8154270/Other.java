@@ -1,12 +1,10 @@
 /*
- * Copyright (c) 2006, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 Google Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -23,18 +21,9 @@
  * questions.
  */
 
-package sun.swing;
-
 /**
- * This interface is used only for tagging keys for client properties
- * for {@code JComponent} set by UI which needs to be cleared on {@literal L&F}
- * change and serialization.
- *
- * All such keys are removed from client properties in {@code
- * JComponent.setUI()} method after uninstalling old UI and before
- * intalling the new one. They are also removed prior to serialization.
- *
- * @author Igor Kushnirskiy
+ * Tests separate compilation.
  */
-public interface UIClientPropertyKey {
+public class Other {
+  Class<?> clazz = EraseClassInfoAnnotationValueTest.ParametricType.Nested.class;
 }
