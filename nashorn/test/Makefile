@@ -4,7 +4,9 @@
 #
 # This code is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License version 2 only, as
-# published by the Free Software Foundation.
+# published by the Free Software Foundation.  Oracle designates this
+# particular file as subject to the "Classpath" exception as provided
+# by Oracle in the LICENSE file that accompanied this code.
 #
 # This code is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -20,15 +22,18 @@
 # or visit www.oracle.com if you need additional information or have any
 # questions.
 #
-#
 
 #
-# Makefile to run various hotspot tests
+# Makefile to run various nashorn tests
 #
 
-ALT_MAKE ?= closed
+.DEFAULT : all
 
-GETMIXEDPATH=echo
+# Empty these to get rid of some default rules
+.SUFFIXES:
+.SUFFIXES: .java
+CO=
+GET=
 
 # Utilities used
 AWK       = awk
@@ -54,70 +59,21 @@ ZIP       = zip
 
 # Get OS name from uname (Cygwin inexplicably adds _NT-5.1)
 UNAME_S := $(shell $(UNAME) -s | $(CUT) -f1 -d_)
-ifeq ($(UNAME_S), SunOS)
-  PLATFORM = solaris
-  SLASH_JAVA = /java
-  ARCH = $(shell uname -p)
-  ifeq ($(ARCH), i386)
-    ARCH=i586
-  endif
-endif
-ifeq ($(UNAME_S), Linux)
-  PLATFORM = linux
-  SLASH_JAVA = /java
-  ARCH = $(shell uname -m)
-  ifeq ($(ARCH), i386)
-    ARCH = i586
-  endif
-endif
-ifeq ($(UNAME_S), Darwin)
-  PLATFORM = bsd
-  SLASH_JAVA = /java
-  ARCH = $(shell uname -m)
-  ifeq ($(ARCH), i386)
-    ARCH = i586
-  endif
-endif
-ifeq ($(findstring BSD,$(UNAME_S)), BSD)
-  PLATFORM = bsd
-  SLASH_JAVA = /java
-  ARCH = $(shell uname -m)
-  ifeq ($(ARCH), i386)
-    ARCH = i586
-  endif
-endif
-ifeq ($(PLATFORM),)
-  # detect whether we're running in MKS or cygwin
-  ifeq ($(UNAME_S), Windows_NT) # MKS
-    GETMIXEDPATH=dosname -s
-  endif
-  ifeq ($(findstring CYGWIN,$(UNAME_S)), CYGWIN)
-    GETMIXEDPATH=cygpath -m
-  endif
-  PLATFORM = windows
-  SLASH_JAVA = J:
-  ifeq ($(word 1, $(PROCESSOR_IDENTIFIER)),ia64)
-    ARCH = ia64
-  else
-    ifeq ($(word 1, $(PROCESSOR_IDENTIFIER)),AMD64)
-      ARCH = x64
-    else
-      ifeq ($(word 1, $(PROCESSOR_IDENTIFIER)),EM64T)
-        ARCH = x64
-      else
-        ARCH = i586
-      endif
-    endif
-  endif
-  EXESUFFIX = .exe
-endif
 
-ifdef ALT_SLASH_JAVA
-  SLASH_JAVA = $(ALT_SLASH_JAVA)
+# Commands to run on paths to make mixed paths for java on windows
+ifeq ($(UNAME_S), CYGWIN)
+  # Location of developer shared files
+  SLASH_JAVA = J:
+  GETMIXEDPATH = cygpath -m
+else
+  # Location of developer shared files
+  SLASH_JAVA = /java
+
+  GETMIXEDPATH=$(ECHO)
 endif
 
 # Root of this test area (important to use full paths in some places)
-TEST_ROOT := $(shell pwd)
+TEST_ROOT := $(shell $(PWD))
 
 # Root of all test results
 ifdef TEST_OUTPUT_DIR
@@ -149,10 +105,17 @@ ifndef PRODUCT_HOME
   PRODUCT_HOME := $(PRODUCT_HOME)
 endif
 
-# Expect JPRT to set JAVA_ARGS (e.g. -server etc.)
-JAVA_OPTIONS =
-ifdef JAVA_ARGS
-  JAVA_OPTIONS = $(JAVA_ARGS)
+# Expect JPRT to set JPRT_PRODUCT_ARGS (e.g. -server etc.)
+#   Should be passed into 'java' only.
+#   Could include: -d64 -server -client OR any java option
+ifdef JPRT_PRODUCT_ARGS
+  JAVA_ARGS = $(JPRT_PRODUCT_ARGS)
+endif
+
+# Expect JPRT to set JPRT_PRODUCT_VM_ARGS (e.g. -Xcomp etc.)
+#   Should be passed into anything running the vm (java, javac, javadoc, ...).
+ifdef JPRT_PRODUCT_VM_ARGS
+  JAVA_VM_ARGS = $(JPRT_PRODUCT_VM_ARGS)
 endif
 
 # jtreg -nativepath <dir>
@@ -165,7 +128,7 @@ else ifdef JPRT_TESTNATIVE_PATH
   TESTNATIVE_DIR = $(JPRT_TESTNATIVE_PATH)
 endif
 ifdef TESTNATIVE_DIR
-  JTREG_NATIVE_PATH = -nativepath:$(shell $(GETMIXEDPATH) "$(TESTNATIVE_DIR)/hotspot/jtreg/native")
+  JTREG_NATIVE_PATH = -nativepath:$(shell $(GETMIXEDPATH) "$(TESTNATIVE_DIR)/nashorn/jtreg/native")
 endif
 
 # jtreg failure handler config
@@ -181,15 +144,16 @@ ifneq ($(FAILURE_HANDLER_DIR), )
       -observerDir:$(FAILURE_HANDLER_DIR_MIXED)/jtregFailureHandler.jar \
       -timeoutHandler:jdk.test.failurehandler.jtreg.GatherProcessInfoTimeoutHandler \
       -observer:jdk.test.failurehandler.jtreg.GatherDiagnosticInfoObserver
-  ifeq ($(PLATFORM), windows)
+  ifeq ($(UNAME_S), CYGWIN)
     JTREG_FAILURE_HANDLER_OPTIONS += -J-Djava.library.path="$(FAILURE_HANDLER_DIR_MIXED)"
   endif
 endif
 
 # Expect JPRT to set JPRT_ARCHIVE_BUNDLE (path to zip bundle for results)
-ARCHIVE_BUNDLE = $(ABS_TEST_OUTPUT_DIR)/ARCHIVE_BUNDLE.zip
 ifdef JPRT_ARCHIVE_BUNDLE
   ARCHIVE_BUNDLE = $(JPRT_ARCHIVE_BUNDLE)
+else
+  ARCHIVE_BUNDLE = $(ABS_TEST_OUTPUT_DIR)/ARCHIVE_BUNDLE.zip
 endif
 
 # How to create the test bundle (pass or fail, we want to create this)
@@ -259,24 +223,29 @@ BUNDLE_UP_AND_EXIT = \
 
 ################################################################
 
-# Default make rule (runs jtreg_tests)
-all: hotspot_all
+# Default make rule (runs default nashorn tests)
+all: nashorn_default
 	@$(ECHO) "Testing completed successfully"
 
-# Support "hotspot_" prefixed test make targets (too)
-# The hotspot_% targets are used by the top level Makefile
-# Unless explicitly defined below, hotspot_<x> is interpreted as a jtreg test group name
-hotspot_%:
-	$(ECHO) "Running tests: $@"
-	$(MAKE) -j 1 TEST_SELECTION=":$@" UNIQUE_DIR=$@ jtreg_tests;
-
-hotspot_internal:
-	$(ALT_OUTPUTDIR)/jdk/bin/java -XX:+ExecuteInternalVMTests -XX:+ShowMessageBoxOnError -version
-
 # Prep for output
-prep: clean
+# Change execute permissions on shared library files.
+# Files in repositories should never have execute permissions, but
+# there are some tests that have pre-built shared libraries, and these
+# windows dll files must have execute permission. Adding execute
+# permission may happen automatically on windows when using certain
+# versions of mercurial but it cannot be guaranteed. And blindly
+# adding execute permission might be seen as a mercurial 'change', so
+# we avoid adding execute permission to repository files. But testing
+# from a plain source tree needs the chmod a+rx. Applying the chmod to
+# all shared libraries not just dll files. And with CYGWIN and sshd
+# service, you may need CYGWIN=ntsec for this to work.
+prep:
 	@$(MKDIR) -p $(ABS_TEST_OUTPUT_DIR)
-	@$(MKDIR) -p `dirname $(ARCHIVE_BUNDLE)`
+	@$(MKDIR) -p `$(DIRNAME) $(ARCHIVE_BUNDLE)`
+	@if [ ! -d $(TEST_ROOT)/../.hg ] ; then                          \
+	  $(FIND) $(TEST_ROOT) \( -name \*.dll -o -name \*.DLL -o -name \*.so \)  \
+	        -exec $(CHMOD) a+rx {} \; ;                             \
+        fi
 
 # Cleanup
 clean:
@@ -289,11 +258,42 @@ clean:
 
 # Expect JT_HOME to be set for jtreg tests. (home for jtreg)
 ifndef JT_HOME
-  JT_HOME = $(SLASH_JAVA)/re/jtreg/4.1/promoted/latest/binaries/jtreg
+  JT_HOME = $(SLASH_JAVA)/re/jtreg/4.2/promoted/latest/binaries/jtreg
   ifdef JPRT_JTREG_HOME
     JT_HOME = $(JPRT_JTREG_HOME)
   endif
 endif
+
+# Problematic tests to be excluded
+PROBLEM_LISTS=$(call MixedDirs,$(wildcard ProblemList.txt closed/ProblemList.txt))
+
+# Create exclude list for this platform and arch
+ifdef NO_EXCLUDES
+  JTREG_EXCLUSIONS =
+else
+  JTREG_EXCLUSIONS = $(PROBLEM_LISTS:%=-exclude:%)
+endif
+
+# convert list of directories to dos paths
+define MixedDirs
+$(foreach i,$1,$(shell $(GETMIXEDPATH) "${i}"))
+endef
+
+define SummaryInfo
+$(ECHO) "########################################################"
+$(CAT) $(?:%=$(ABS_TEST_OUTPUT_DIR)/%/$(STATS_TXT_NAME))
+$(ECHO) "########################################################"
+endef
+
+# ------------------------------------------------------------------
+
+nashorn_%:
+	$(ECHO) "Running tests: $@"
+	for each in $@; do \
+	        $(MAKE) -j 1 TEST_SELECTION=":$$each" UNIQUE_DIR=$$each jtreg_tests; \
+	done
+
+# ------------------------------------------------------------------
 
 # When called from JPRT the TESTDIRS variable is set to the jtreg tests to run
 ifdef TESTDIRS
@@ -306,11 +306,13 @@ endif
 
 # Default JTREG to run
 JTREG = $(JT_HOME)/bin/jtreg
-
-# Use agent mode
+# run in agentvm mode
 JTREG_BASIC_OPTIONS += -agentvm
 # Only run automatic tests
 JTREG_BASIC_OPTIONS += -a
+# Always turn on assertions
+JTREG_ASSERT_OPTION = -ea -esa
+JTREG_BASIC_OPTIONS += $(JTREG_ASSERT_OPTION)
 # Report details on all failed or error tests, times too
 JTREG_BASIC_OPTIONS += -v:fail,error,time
 # Retain all files for failing tests
@@ -318,27 +320,29 @@ JTREG_BASIC_OPTIONS += -retain:fail,error
 # Ignore tests are not run and completely silent about it
 JTREG_IGNORE_OPTION = -ignore:quiet
 JTREG_BASIC_OPTIONS += $(JTREG_IGNORE_OPTION)
-# Multiply by 4 the timeout factor
+# Multiple by 4 the timeout numbers
 JTREG_TIMEOUT_OPTION =  -timeoutFactor:4
 JTREG_BASIC_OPTIONS += $(JTREG_TIMEOUT_OPTION)
+# Set the max memory for jtreg control vm
+JTREG_MEMORY_OPTION = -J-Xmx512m
+JTREG_BASIC_OPTIONS += $(JTREG_MEMORY_OPTION)
+# Give tests access to JT_JAVA, see JDK-8141609
+JTREG_BASIC_OPTIONS += -e:JDK8_HOME=${JT_JAVA}
 # Add any extra options
 JTREG_BASIC_OPTIONS += $(EXTRA_JTREG_OPTIONS)
 # Set other vm and test options
-JTREG_TEST_OPTIONS = $(JAVA_ARGS:%=-javaoptions:%) $(JAVA_OPTIONS:%=-vmoption:%) $(JAVA_VM_ARGS:%=-vmoption:%)
-
-# Option to tell jtreg to not run tests marked with "ignore"
-ifeq ($(PLATFORM), windows)
-  JTREG_KEY_OPTION = -k:!ignore
-else
-  JTREG_KEY_OPTION = -k:\!ignore
-endif
-JTREG_BASIC_OPTIONS += $(JTREG_KEY_OPTION)
-
--include $(ALT_MAKE)/Makefile
+JTREG_TEST_OPTIONS = $(JAVA_ARGS:%=-javaoptions:%) $(JAVA_VM_ARGS:%=-vmoption:%)
+# Set the GC options for test vms
+#JTREG_GC_OPTION = -vmoption:-XX:+UseSerialGC
+#JTREG_TEST_OPTIONS += $(JTREG_GC_OPTION)
+# Set the max memory for jtreg target test vms
+JTREG_TESTVM_MEMORY_OPTION = -vmoption:-Xmx512m
+JTREG_TEST_OPTIONS += $(JTREG_TESTVM_MEMORY_OPTION)
 
 # Make sure jtreg exists
 $(JTREG): $(JT_HOME)
 
+# Run jtreg
 jtreg_tests: prep $(PRODUCT_HOME) $(JTREG)
 	(                                                                    \
 	  ( JT_HOME=$(shell $(GETMIXEDPATH) "$(JT_HOME)");                   \
@@ -352,87 +356,12 @@ jtreg_tests: prep $(PRODUCT_HOME) $(JTREG)
               $(JTREG_FAILURE_HANDLER_OPTIONS)                               \
               $(JTREG_EXCLUSIONS)                                            \
               $(JTREG_TEST_OPTIONS)                                          \
-              $(TEST_SELECTION)                                              \
+              $(TEST_SELECTION)                                                    \
 	  ) ;                                                                \
 	  $(BUNDLE_UP_AND_EXIT)                                              \
 	) 2>&1 | $(TEE) $(ABS_TEST_OUTPUT_DIR)/output.txt ; $(TESTEXIT)
 
 PHONY_LIST += jtreg_tests
-
-# flags used to execute java in test targets
-TEST_FLAGS += -version -Xinternalversion -X -help
-
-sanitytest: prep $(PRODUCT_HOME)
-	@for flag in $(TEST_FLAGS);                                             \
-	do                                                                      \
-	    echo Executing java $(JAVA_OPTIONS) $$flag;                         \
-	    $(PRODUCT_HOME)/bin/java $(JAVA_OPTIONS) $$flag;                    \
-	    res=$$?;                                                            \
-	    if [ $$res -ne 0 ]; then                                            \
-	        exit $$res;                                                     \
-	    fi;                                                                 \
-	done
-
-PHONY_LIST += sanitytest
-
-################################################################
-
-# basicvmtest (make sure various basic java options work)
-
-# Set up the directory in which the jvm directories live (client/, server/, etc.)
-ifeq ($(PLATFORM),windows)
-JVMS_DIR := $(PRODUCT_HOME)/bin
-else ifeq ($(PLATFORM),bsd)
-JVMS_DIR := $(PRODUCT_HOME)/lib
-else
-# The jvms live in the architecture directory (amd64, sparcv9,
-# etc.). By using a wildcard there's no need to figure out the exact
-# name of that directory.
-JVMS_DIR := $(PRODUCT_HOME)/lib/*
-endif
-
-# Use the existance of a directory as a sign that jvm variant is available
-CANDIDATE_JVM_VARIANTS := client minimal server
-JVM_VARIANTS := $(strip $(foreach x,$(CANDIDATE_JVM_VARIANTS),$(if $(wildcard $(JVMS_DIR)/$(x)),$(x))))
-
-hotspot_basicvmtest:
-	for variant in $(JVM_VARIANTS);                                           \
-	do                                                                        \
-	    $(MAKE) JAVA_ARGS="$(JAVA_ARGS) -$$variant" hotspot_$${variant}test;  \
-	    res=$$?;                                                              \
-	    if [ $$res -ne 0 ]; then                                              \
-	        exit $$res;                                                       \
-	    fi;                                                                   \
-	done
-
-PHONY_LIST += hotspot_basicvmtest
-
-################################################################
-
-# clienttest (make sure various basic java client options work)
-
-hotspot_clienttest clienttest: sanitytest
-	$(RM) $(PRODUCT_HOME)/jre/lib/*/client/classes.jsa
-	$(RM) $(PRODUCT_HOME)/jre/bin/client/classes.jsa
-	$(PRODUCT_HOME)/bin/java $(JAVA_OPTIONS) -Xshare:dump
-
-PHONY_LIST += hotspot_clienttest clienttest
-
-################################################################
-
-# minimaltest (make sure various basic java minimal options work)
-
-hotspot_minimaltest minimaltest: sanitytest
-
-PHONY_LIST += hotspot_minimaltest minimaltest
-
-################################################################
-
-# servertest (make sure various basic java server options work)
-
-hotspot_servertest servertest: sanitytest
-
-PHONY_LIST += hotspot_servertest servertest
 
 ################################################################
 

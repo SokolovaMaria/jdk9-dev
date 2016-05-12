@@ -1,10 +1,12 @@
 /*
- * Copyright (c) 1999, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -20,30 +22,26 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+package sun.rmi.transport.tcp;
 
-import java.rmi.*;
-import java.rmi.server.*;
+import java.io.IOException;
+import java.net.Socket;
+import java.net.ServerSocket;
+import java.rmi.server.RMISocketFactory;
 
-public class TestImpl
-    extends Object
-    implements TestIface
-{
-    public TestImpl() {
-    }
+/**
+ * RMIDirectSocketFactory creates a direct socket connection to the
+ * specified port on the specified host.
+ */
+public class TCPDirectSocketFactory extends RMISocketFactory {
 
-    public TestIface export()
-        throws RemoteException
+    public Socket createSocket(String host, int port) throws IOException
     {
-        return (TestIface)UnicastRemoteObject.exportObject(this);
+        return new Socket(host, port);
     }
 
-    public void unexport()
-        throws NoSuchObjectException
+    public ServerSocket createServerSocket(int port) throws IOException
     {
-        UnicastRemoteObject.unexportObject(this, true);
-    }
-
-    public String testCall(String ign) {
-        return ("OK");
+        return new ServerSocket(port);
     }
 }
