@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -20,10 +20,30 @@
  *
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
-package java.net.http;
+import java.util.function.Consumer;
+import java.nio.ByteBuffer;
 
-public interface HttpHeaders1 extends HttpHeaders {
-    public void makeUnmodifiable();
+/*
+ * @test
+ * @bug 8154180
+ * @summary Regression: stuck expressions do not behave correctly
+ * @compile T8154180a.java
+ */
+class T8154180a {
+    T8154180a(Consumer<ByteBuffer> cb) { }
+
+    public static void main(String[] args) {
+        new T8154180a(b -> System.out.println(asString(b)));
+        new T8154180a((b -> System.out.println(asString(b))));
+        new T8154180a(true ? b -> System.out.println(asString(b)) : b -> System.out.println(asString(b)));
+        new T8154180a((true ? b -> System.out.println(asString(b)) : b -> System.out.println(asString(b))));
+        new T8154180a((true ? (b -> System.out.println(asString(b))) : (b -> System.out.println(asString(b)))));
+    }
+
+    static String asString(ByteBuffer buf) {
+        return null;
+    }
 }

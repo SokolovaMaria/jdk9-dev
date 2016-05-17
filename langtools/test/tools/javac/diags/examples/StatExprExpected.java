@@ -22,16 +22,14 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.tools.jlink.plugin;
 
-import java.util.Properties;
+// key: compiler.err.prob.found.req
+// key: compiler.misc.stat.expr.expected
 
-/**
- * Interface to plugin (container) context.
- */
-public interface PluginContext {
-    /**
-     * Returns 'release' properties
-     */
-    public Properties getReleaseProperties();
+class StatExprExpected {
+    void test() {
+        Runnable r = () -> (foo());
+    }
+
+    int foo() { return 1; }
 }
