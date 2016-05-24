@@ -23,23 +23,27 @@
  * questions.
  */
 
-package jdk.internal.netscape.javascript.spi;
+/*
+ * @test
+ * @bug 8157149
+ * @summary Inference: weird propagation of thrown inference variables
+ *
+ * @compile T8157149c.java
+ */
 
-import java.applet.Applet;
-import netscape.javascript.JSException;
-import netscape.javascript.JSObject;
+class T8157149c  {
 
-@SuppressWarnings("deprecation")
-public interface JSObjectProvider {
-    /**
-     * Return a JSObject for the window containing the given applet.
-     * Implementations of this class should return null if not connected to a
-     * browser, for example, when running in AppletViewer.
-     *
-     * @param applet The applet.
-     * @return JSObject for the window containing the given applet or null if we
-     * are not connected to a browser.
-     * @throws JSException when an error is encountered.
-     */
-    public JSObject getWindow(Applet applet) throws JSException;
+    interface I<T extends C<?, ?>, U> {
+        T m(U o);
+    }
+
+    static class C<T, U> {
+        C(T f) { }
+    }
+
+    <T, A> void m(I<C<T, Object>, A> o1, A o2) { }
+
+    void test(Object o) {
+        m(C::new, o);
+    }
 }

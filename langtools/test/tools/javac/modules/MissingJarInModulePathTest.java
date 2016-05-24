@@ -4,9 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -23,23 +21,11 @@
  * questions.
  */
 
-package jdk.internal.netscape.javascript.spi;
+/*
+ * @test
+ * @bug 8154824
+ * @summary Compiler should handle java.nio.file.FileSystemNotFoundException gracefully and not abort
+ * @compile/fail/ref=MissingJarInModulePathTest.out -XDrawDiagnostics -Xlint:path -Werror -modulepath missing.jar MissingJarInModulePathTest.java
+ */
 
-import java.applet.Applet;
-import netscape.javascript.JSException;
-import netscape.javascript.JSObject;
-
-@SuppressWarnings("deprecation")
-public interface JSObjectProvider {
-    /**
-     * Return a JSObject for the window containing the given applet.
-     * Implementations of this class should return null if not connected to a
-     * browser, for example, when running in AppletViewer.
-     *
-     * @param applet The applet.
-     * @return JSObject for the window containing the given applet or null if we
-     * are not connected to a browser.
-     * @throws JSException when an error is encountered.
-     */
-    public JSObject getWindow(Applet applet) throws JSException;
-}
+class MissingJarInModulePathTest {}
