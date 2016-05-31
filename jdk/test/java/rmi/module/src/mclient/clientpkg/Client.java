@@ -1,12 +1,10 @@
 /*
- * Copyright (c) 2007, 2009, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -23,28 +21,27 @@
  * questions.
  */
 
-package com.sun.nio.file;
+package clientpkg;
 
-import java.nio.file.OpenOption;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
-/**
- * Defines <em>extended</em> open options supported on some platforms
- * by Sun's provider implementation.
- *
- * @since 1.7
- */
+import serverpkg.Hello;
 
-public enum ExtendedOpenOption implements OpenOption {
-    /**
-     * Prevent operations on the file that request read access.
-     */
-    NOSHARE_READ,
-    /**
-     * Prevent operations on the file that request write access.
-     */
-    NOSHARE_WRITE,
-    /**
-     * Prevent operations on the file that request delete access.
-     */
-    NOSHARE_DELETE;
+public class Client {
+    int port;
+    Hello stub;
+
+    public Client(Hello stub) {
+        this.stub = stub;
+    }
+
+    public String testStub() throws Exception {
+        try {
+            return stub.sayHello();
+        } catch (Exception e) {
+            System.err.println("Client exception: " + e.toString());
+            throw e;
+        }
+    }
 }
