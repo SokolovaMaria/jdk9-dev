@@ -21,29 +21,9 @@
  * questions.
  */
 
-/*
- * @test
- * @library /testlibrary
- * @requires vm.flavor != "minimal"
- * @run main/othervm/native -agentlib:SimpleClassFileLoadHook=Foo,XXX,YYY
- *      SimpleClassFileLoadHookTest
- */
-import jdk.test.lib.Asserts;
+// key: compiler.err.service.implementation.must.be.subtype.of.service.interface
+// key: compiler.err.service.implementation.not.in.right.module
 
-class Foo {
-    static String getValue() {
-        return "XXX";
-    }
-    static String getOtherValue() {
-        return "xXXXxx";
-    }
-}
-public class SimpleClassFileLoadHookTest {
-    public static void main(String args[]) {
-        System.out.println(Foo.getValue());
-        System.out.println(Foo.getOtherValue());
-        Asserts.assertTrue("YYY".equals(Foo.getValue()) &&
-                           "xYYYxx".equals(Foo.getOtherValue()),
-                           "SimpleClassFileLoadHook should replace XXX with YYY");
-    }
+module ServiceImplMustBeSubtypeOfServiceIntf {
+    provides java.lang.String with java.io.File;
 }
