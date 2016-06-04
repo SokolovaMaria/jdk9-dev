@@ -1,10 +1,12 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -21,23 +23,18 @@
  * questions.
  */
 
-package jdk.test.resources;
+/**
+ * @test
+ * @bug 8158355
+ * @summary Inference graph dot support broken
+ * @compile -XDdumpInferenceGraphsTo=. T8158355.java
+ */
+import java.util.List;
 
-import java.util.Locale;
-import java.util.ResourceBundle;
-import java.util.spi.AbstractResourceBundleProvider;
+class T8158355 {
+    <Z> List<Z> m() { return null; }
 
-public class MyResourcesProviderImpl extends AbstractResourceBundleProvider
-    implements MyResourcesProvider
-{
-    public MyResourcesProviderImpl() {
-        super("java.class");
-    }
-    @Override
-    public ResourceBundle getBundle(String baseName, Locale locale) {
-        if (locale.equals(Locale.ENGLISH) || locale.equals(Locale.ROOT)) {
-            return super.getBundle(baseName, locale);
-        }
-        return null;
+    void test() {
+        List<String> ls = m();
     }
 }

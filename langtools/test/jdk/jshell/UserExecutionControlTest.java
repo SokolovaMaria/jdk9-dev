@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,23 +21,33 @@
  * questions.
  */
 
-package jdk.test.resources;
+/*
+ * @test
+ * @bug 8156101
+ * @summary Tests for ExecutionControl SPI
+ * @build KullaTesting LocalExecutionControl ExecutionControlTestBase
+ * @run testng UserExecutionControlTest
+ */
 
-import java.util.Locale;
-import java.util.ResourceBundle;
-import java.util.spi.AbstractResourceBundleProvider;
 
-public class MyResourcesProviderImpl extends AbstractResourceBundleProvider
-    implements MyResourcesProvider
-{
-    public MyResourcesProviderImpl() {
-        super("java.class");
-    }
+import org.testng.annotations.Test;
+import static org.testng.Assert.assertEquals;
+import org.testng.annotations.BeforeMethod;
+
+@Test
+public class UserExecutionControlTest extends ExecutionControlTestBase {
+
+    @BeforeMethod
     @Override
-    public ResourceBundle getBundle(String baseName, Locale locale) {
-        if (locale.equals(Locale.ENGLISH) || locale.equals(Locale.ROOT)) {
-            return super.getBundle(baseName, locale);
-        }
-        return null;
+    public void setUp() {
+        setUp(new LocalExecutionControl());
     }
+
+    public void verifyLocal() throws ClassNotFoundException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+        System.setProperty("LOCAL_CHECK", "TBD");
+        assertEquals(System.getProperty("LOCAL_CHECK"), "TBD");
+        assertEval("System.setProperty(\"LOCAL_CHECK\", \"local\")");
+        assertEquals(System.getProperty("LOCAL_CHECK"), "local");
+    }
+
 }

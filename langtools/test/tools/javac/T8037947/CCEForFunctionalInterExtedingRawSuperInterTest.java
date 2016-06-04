@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,23 +21,18 @@
  * questions.
  */
 
-package jdk.test.resources;
+/*
+ * @test
+ * @bug 8037947
+ * @summary functional interface causes ClassCastException when extending raw superinterface
+ * @modules jdk.compiler/com.sun.tools.javac.util
+ * @compile CCEForFunctionalInterExtedingRawSuperInterTest.java
+ */
 
-import java.util.Locale;
-import java.util.ResourceBundle;
-import java.util.spi.AbstractResourceBundleProvider;
+public class CCEForFunctionalInterExtedingRawSuperInterTest {
+    interface X<A> { <T extends A> void execute(int a); }
+    interface Y<B> { <S extends B> void execute(int a); }
 
-public class MyResourcesProviderImpl extends AbstractResourceBundleProvider
-    implements MyResourcesProvider
-{
-    public MyResourcesProviderImpl() {
-        super("java.class");
-    }
-    @Override
-    public ResourceBundle getBundle(String baseName, Locale locale) {
-        if (locale.equals(Locale.ENGLISH) || locale.equals(Locale.ROOT)) {
-            return super.getBundle(baseName, locale);
-        }
-        return null;
-    }
+    @FunctionalInterface
+    interface Exec<A> extends Y, X<A> { }
 }
