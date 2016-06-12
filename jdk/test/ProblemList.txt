@@ -167,6 +167,8 @@ java/net/MulticastSocket/Test.java                              7145658 macosx-a
 
 java/net/DatagramSocket/SendDatagramToBadAddress.java           7143960 macosx-all
 
+sun/net/www/http/ChunkedOutputStream/checkError.java            8041924 linux-all
+
 ############################################################################
 
 # jdk_nio
@@ -208,9 +210,6 @@ java/rmi/transport/dgcDeadLock/DGCDeadLock.java                 8029360 macosx-a
 sun/security/pkcs11/ec/TestKeyFactory.java                      7157786 generic-all
 
 sun/security/krb5/auto/Unreachable.java                         7164518 macosx-all no PortUnreachableException on Mac
-
-java/security/KeyPairGenerator/SolarisShortDSA.java             7041639 solaris-all
-sun/security/tools/keytool/standard.sh                          7041639 solaris-all
 
 sun/security/tools/keytool/ListKeychainStore.sh                 8156889 macosx-all
 
@@ -400,5 +399,29 @@ com/sun/jndi/ldap/DeadSSLLdapTimeoutTest.java                   8141370 linux-i5
 # core_tools
 
 tools/jlink/plugins/IncludeLocalesPluginTest.java               8158272 generic-all
+
+tools/jlink/basic/BasicTest.java                                8159206 generic-all
+
+tools/jlink/IntegrationTest.java                                8159206 generic-all
+
+tools/jlink/JLinkOptimTest.java                                 8159206 generic-all
+
+tools/jlink/JLinkTest.java                                      8159206 generic-all
+
+tools/jlink/plugins/CompressorPluginTest.java                   8159206 generic-all
+
+tools/jlink/plugins/ExcludeFilesPluginTest.java                 8159206 generic-all
+
+tools/jlink/plugins/ExcludePluginTest.java                      8159206 generic-all
+
+tools/jlink/plugins/ExcludeVMPluginTest.java                    8159206 generic-all
+
+tools/jlink/plugins/OrderResourcesPluginTest.java               8159206 generic-all
+
+tools/jlink/plugins/ResourceFilterTest.java                     8159206 generic-all
+
+tools/jlink/plugins/StringSharingPluginTest.java                8159206 generic-all
+
+tools/jmod/JmodTest.java                                        8159206 generic-all
 
 ############################################################################
