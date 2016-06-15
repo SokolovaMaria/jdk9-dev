@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -20,16 +20,17 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-import java.io.*;
-import sun.misc.*;
 
-public class CreateSerialized {
-    public static void main(String[] args) throws Exception {
-        Object o = new com.sun.crypto.provider.SunJCE();
+/*
+ * @test ReservedStackTestCompiler
+ * @summary Run ReservedStackTest with dedicated compilers C1 and C2.
+ * @requires vm.flavor == "server"
+ * @library /testlibrary
+ * @modules java.base/jdk.internal.misc
+ * @modules java.base/jdk.internal.vm.annotation
+ * @build jdk.test.lib.* ReservedStackTest
+ * @run main/othervm -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:-Inline -XX:CompileCommand=exclude,java/util/concurrent/locks/AbstractOwnableSynchronizer.setExclusiveOwnerThread ReservedStackTest
+ * @run main/othervm -XX:-TieredCompilation                         -XX:-Inline -XX:CompileCommand=exclude,java/util/concurrent/locks/AbstractOwnableSynchronizer.setExclusiveOwnerThread ReservedStackTest
+ */
 
-        FileOutputStream fos = new FileOutputStream("object.tmp");
-        ObjectOutputStream objectOutputStream = new ObjectOutputStream(fos);
-        objectOutputStream.writeObject(o);
-        fos.close();
-    }
-}
+// Intentionally left blank. Just runs ReservedStackTest with @requires annotation.
