@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,11 +21,13 @@
  * questions.
  */
 
-// This loads the class affected by the -Xpatch option.  For the test to pass
-// it must load both classes from the -Xpatch directory, not the jimage file.
-public class Xpatch2DirsMain {
-    public static void main(String[] args) throws Exception {
-        Class.forName(args[0]);
-        Class.forName(args[1]);
-    }
-}
+/*
+ * @test
+ * @bug 8132943
+ * @library ../../../../java/security/testlibrary
+ * @build CertificateBuilder SimpleOCSPServer
+ * @run main/othervm java.base/sun.security.ssl.StatusReqSelection
+ * @summary ServerHandshaker may select non-empty OCSPStatusRequest
+ *          structures when Responder ID selection is not supported
+ */
+
