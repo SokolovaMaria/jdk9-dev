@@ -70,6 +70,7 @@ import static com.sun.tools.javac.code.Kinds.Kind.*;
 import static com.sun.tools.javac.code.TypeTag.*;
 import static com.sun.tools.javac.code.TypeTag.WILDCARD;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
+import com.sun.tools.javac.util.JCDiagnostic.DiagnosticFlag;
 
 /** This is the main context-dependent analysis phase in GJC. It
  *  encompasses name resolution, type checking and constant folding as
@@ -1282,13 +1283,9 @@ public class Attr extends JCTree.Visitor {
         try {
 
             boolean enumSwitch = (seltype.tsym.flags() & Flags.ENUM) != 0;
-            boolean stringSwitch = false;
-            if (types.isSameType(seltype, syms.stringType)) {
-                if (allowStringsInSwitch) {
-                    stringSwitch = true;
-                } else {
-                    log.error(tree.selector.pos(), "string.switch.not.supported.in.source", sourceName);
-                }
+            boolean stringSwitch = types.isSameType(seltype, syms.stringType);
+            if (stringSwitch && !allowStringsInSwitch) {
+                log.error(DiagnosticFlag.SOURCE_LEVEL, tree.selector.pos(), "string.switch.not.supported.in.source", sourceName);
             }
             if (!enumSwitch && !stringSwitch)
                 seltype = chk.checkType(tree.selector.pos(), seltype, syms.intType);
@@ -3159,7 +3156,7 @@ public class Attr extends JCTree.Visitor {
         Type operand = attribExpr(tree.rhs, env);
         // Find operator.
         Symbol operator = tree.operator = operators.resolveBinary(tree, tree.getTag().noAssignOp(), owntype, operand);
-        if (operator.kind == MTH &&
+        if (operator != operators.noOpSymbol &&
                 !owntype.isErroneous() &&
                 !operand.isErroneous()) {
             chk.checkDivZero(tree.rhs.pos(), operator, operand);
@@ -3179,7 +3176,7 @@ public class Attr extends JCTree.Visitor {
         // Find operator.
         Symbol operator = tree.operator = operators.resolveUnary(tree, tree.getTag(), argtype);
         Type owntype = types.createErrorType(tree.type);
-        if (operator.kind == MTH &&
+        if (operator != operators.noOpSymbol &&
                 !argtype.isErroneous()) {
             owntype = (tree.getTag().isIncOrDecUnaryOp())
                 ? tree.arg.type
@@ -3204,7 +3201,7 @@ public class Attr extends JCTree.Visitor {
         // Find operator.
         Symbol operator = tree.operator = operators.resolveBinary(tree, tree.getTag(), left, right);
         Type owntype = types.createErrorType(tree.type);
-        if (operator.kind == MTH &&
+        if (operator != operators.noOpSymbol &&
                 !left.isErroneous() &&
                 !right.isErroneous()) {
             owntype = operator.type.getReturnType();
@@ -3484,7 +3481,7 @@ public class Attr extends JCTree.Visitor {
             }
             if (!allowStaticInterfaceMethods && sitesym.isInterface() &&
                     sym.isStatic() && sym.kind == MTH) {
-                log.error(tree.pos(), "static.intf.method.invoke.not.supported.in.source", sourceName);
+                log.error(DiagnosticFlag.SOURCE_LEVEL, tree.pos(), "static.intf.method.invoke.not.supported.in.source", sourceName);
             }
         } else if (sym.kind != ERR &&
                    (sym.flags() & STATIC) != 0 &&
@@ -4282,6 +4279,9 @@ public class Attr extends JCTree.Visitor {
             case TOPLEVEL:
                 attribTopLevel(env);
                 break;
+            case PACKAGEDEF:
+                attribPackage(env.tree.pos(), ((JCPackageDecl) env.tree).packge);
+                break;
             default:
                 attribClass(env.tree.pos(), env.enclClass.sym);
         }
@@ -4298,6 +4298,20 @@ public class Attr extends JCTree.Visitor {
         } catch (CompletionFailure ex) {
             chk.completionError(toplevel.pos(), ex);
         }
+    }
+
+    public void attribPackage(DiagnosticPosition pos, PackageSymbol p) {
+        try {
+            annotate.flush();
+            attribPackage(p);
+        } catch (CompletionFailure ex) {
+            chk.completionError(pos, ex);
+        }
+    }
+
+    void attribPackage(PackageSymbol p) {
+        Env<AttrContext> env = typeEnvs.get(p);
+        chk.checkDeprecatedAnnotation(((JCPackageDecl) env.tree).pid.pos(), p);
     }
 
     public void attribModule(DiagnosticPosition pos, ModuleSymbol m) {
