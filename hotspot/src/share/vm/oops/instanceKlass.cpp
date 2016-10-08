@@ -41,6 +41,7 @@
 #include "memory/heapInspection.hpp"
 #include "memory/iterator.inline.hpp"
 #include "memory/metadataFactory.hpp"
+#include "memory/metaspaceShared.hpp"
 #include "memory/oopFactory.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/fieldStreams.hpp"
@@ -56,7 +57,7 @@
 #include "prims/jvmtiRedefineClasses.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "prims/methodComparator.hpp"
-#include "runtime/atomic.inline.hpp"
+#include "runtime/atomic.hpp"
 #include "runtime/fieldDescriptor.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
@@ -516,7 +517,11 @@ bool InstanceKlass::link_class_or_fail(TRAPS) {
 
 bool InstanceKlass::link_class_impl(
     instanceKlassHandle this_k, bool throw_verifyerror, TRAPS) {
-  // check for error state
+  // check for error state.
+  // This is checking for the wrong state.  If the state is initialization_error,
+  // then this class *was* linked.  The CDS code does a try_link_class and uses
+  // initialization_error to mark classes to not include in the archive during
+  // DumpSharedSpaces.  This should be removed when the CDS bug is fixed.
   if (this_k->is_in_error_state()) {
     ResourceMark rm(THREAD);
     THROW_MSG_(vmSymbols::java_lang_NoClassDefFoundError(),
@@ -669,36 +674,21 @@ void InstanceKlass::link_methods(TRAPS) {
 
 // Eagerly initialize superinterfaces that declare default methods (concrete instance: any access)
 void InstanceKlass::initialize_super_interfaces(instanceKlassHandle this_k, TRAPS) {
-  if (this_k->has_default_methods()) {
-    for (int i = 0; i < this_k->local_interfaces()->length(); ++i) {
-      Klass* iface = this_k->local_interfaces()->at(i);
-      InstanceKlass* ik = InstanceKlass::cast(iface);
-      if (ik->should_be_initialized()) {
-        if (ik->has_default_methods()) {
-          ik->initialize_super_interfaces(ik, THREAD);
-        }
-        // Only initialize() interfaces that "declare" concrete methods.
-        // has_default_methods drives searching superinterfaces since it
-        // means has_default_methods in its superinterface hierarchy
-        if (!HAS_PENDING_EXCEPTION && ik->declares_default_methods()) {
-          ik->initialize(THREAD);
-        }
-        if (HAS_PENDING_EXCEPTION) {
-          Handle e(THREAD, PENDING_EXCEPTION);
-          CLEAR_PENDING_EXCEPTION;
-          {
-            EXCEPTION_MARK;
-            // Locks object, set state, and notify all waiting threads
-            this_k->set_initialization_state_and_notify(
-                initialization_error, THREAD);
+  assert (this_k->has_default_methods(), "caller should have checked this");
+  for (int i = 0; i < this_k->local_interfaces()->length(); ++i) {
+    Klass* iface = this_k->local_interfaces()->at(i);
+    InstanceKlass* ik = InstanceKlass::cast(iface);
 
-            // ignore any exception thrown, superclass initialization error is
-            // thrown below
-            CLEAR_PENDING_EXCEPTION;
-          }
-          THROW_OOP(e());
-        }
-      }
+    // Initialization is depth first search ie. we start with top of the inheritance tree
+    // has_default_methods drives searching superinterfaces since it
+    // means has_default_methods in its superinterface hierarchy
+    if (ik->has_default_methods()) {
+      ik->initialize_super_interfaces(ik, CHECK);
+    }
+
+    // Only initialize() interfaces that "declare" concrete methods.
+    if (ik->should_be_initialized() && ik->declares_default_methods()) {
+      ik->initialize(CHECK);
     }
   }
 }
@@ -764,32 +754,36 @@ void InstanceKlass::initialize_impl(instanceKlassHandle this_k, TRAPS) {
   }
 
   // Step 7
-  Klass* super_klass = this_k->super();
-  if (super_klass != NULL && !this_k->is_interface() && super_klass->should_be_initialized()) {
-    super_klass->initialize(THREAD);
+  // Next, if C is a class rather than an interface, initialize it's super class and super
+  // interfaces.
+  if (!this_k->is_interface()) {
+    Klass* super_klass = this_k->super();
+    if (super_klass != NULL && super_klass->should_be_initialized()) {
+      super_klass->initialize(THREAD);
+    }
+    // If C implements any interfaces that declares a non-abstract, non-static method,
+    // the initialization of C triggers initialization of its super interfaces.
+    // Only need to recurse if has_default_methods which includes declaring and
+    // inheriting default methods
+    if (!HAS_PENDING_EXCEPTION && this_k->has_default_methods()) {
+      this_k->initialize_super_interfaces(this_k, THREAD);
+    }
 
+    // If any exceptions, complete abruptly, throwing the same exception as above.
     if (HAS_PENDING_EXCEPTION) {
       Handle e(THREAD, PENDING_EXCEPTION);
       CLEAR_PENDING_EXCEPTION;
       {
         EXCEPTION_MARK;
-        this_k->set_initialization_state_and_notify(initialization_error, THREAD); // Locks object, set state, and notify all waiting threads
-        CLEAR_PENDING_EXCEPTION;   // ignore any exception thrown, superclass initialization error is thrown below
+        // Locks object, set state, and notify all waiting threads
+        this_k->set_initialization_state_and_notify(initialization_error, THREAD);
+        CLEAR_PENDING_EXCEPTION;
       }
       DTRACE_CLASSINIT_PROBE_WAIT(super__failed, this_k(), -1,wait);
       THROW_OOP(e());
     }
   }
 
-  // If C is an interface that declares a non-abstract, non-static method,
-  // the initialization of a class (not an interface) that implements C directly or
-  // indirectly.
-  // Recursively initialize any superinterfaces that declare default methods
-  // Only need to recurse if has_default_methods which includes declaring and
-  // inheriting default methods
-  if (!this_k->is_interface() && this_k->has_default_methods()) {
-    this_k->initialize_super_interfaces(this_k, CHECK);
-  }
 
   // Step 8
   {
@@ -851,10 +845,15 @@ void InstanceKlass::set_initialization_state_and_notify(ClassState state, TRAPS)
 
 void InstanceKlass::set_initialization_state_and_notify_impl(instanceKlassHandle this_k, ClassState state, TRAPS) {
   oop init_lock = this_k->init_lock();
-  ObjectLocker ol(init_lock, THREAD, init_lock != NULL);
-  this_k->set_init_state(state);
-  this_k->fence_and_clear_init_lock();
-  ol.notify_all(CHECK);
+  if (init_lock != NULL) {
+    ObjectLocker ol(init_lock, THREAD);
+    this_k->set_init_state(state);
+    this_k->fence_and_clear_init_lock();
+    ol.notify_all(CHECK);
+  } else {
+    assert(init_lock != NULL, "The initialization state should never be set twice");
+    this_k->set_init_state(state);
+  }
 }
 
 // The embedded _implementor field can only record one implementor.
@@ -1041,7 +1040,8 @@ Klass* InstanceKlass::array_klass_impl(bool or_null, int n, TRAPS) {
 }
 
 Klass* InstanceKlass::array_klass_impl(instanceKlassHandle this_k, bool or_null, int n, TRAPS) {
-  if (this_k->array_klasses() == NULL) {
+  // Need load-acquire for lock-free read
+  if (this_k->array_klasses_acquire() == NULL) {
     if (or_null) return NULL;
 
     ResourceMark rm;
@@ -1054,7 +1054,8 @@ Klass* InstanceKlass::array_klass_impl(instanceKlassHandle this_k, bool or_null,
       // Check if update has already taken place
       if (this_k->array_klasses() == NULL) {
         Klass*    k = ObjArrayKlass::allocate_objArray_klass(this_k->class_loader_data(), 1, this_k, CHECK_NULL);
-        this_k->set_array_klasses(k);
+        // use 'release' to pair with lock-free load
+        this_k->release_set_array_klasses(k);
       }
     }
   }
@@ -1970,11 +1971,6 @@ void InstanceKlass::remove_unshareable_info() {
     m->remove_unshareable_info();
   }
 
-  // cached_class_file might be pointing to a malloc'ed buffer allocated by
-  // event-based tracing code at CDS dump time. It's not usable at runtime
-  // so let's clear it.
-  set_cached_class_file(NULL);
-
   // do array classes also.
   array_klasses_do(remove_unshareable_in_class);
 }
@@ -2068,6 +2064,7 @@ void InstanceKlass::release_C_heap_structures(InstanceKlass* ik) {
 }
 
 void InstanceKlass::release_C_heap_structures() {
+  assert(!this->is_shared(), "should not be called for a shared class");
 
   // Can't release the constant pool here because the constant pool can be
   // deallocated separately from the InstanceKlass for default methods and
@@ -2248,8 +2245,8 @@ void InstanceKlass::set_package(ClassLoaderData* loader_data, TRAPS) {
         // the java.base module.  If a non-java.base package is erroneously placed
         // in the java.base module it will be caught later when java.base
         // is defined by ModuleEntryTable::verify_javabase_packages check.
-        assert(ModuleEntryTable::javabase_module() != NULL, "java.base module is NULL");
-        _package_entry = loader_data->packages()->lookup(pkg_name, ModuleEntryTable::javabase_module());
+        assert(ModuleEntryTable::javabase_moduleEntry() != NULL, "java.base module is NULL");
+        _package_entry = loader_data->packages()->lookup(pkg_name, ModuleEntryTable::javabase_moduleEntry());
       } else {
         assert(loader_data->modules()->unnamed_module() != NULL, "unnamed module is NULL");
         _package_entry = loader_data->packages()->lookup(pkg_name,
@@ -3363,88 +3360,119 @@ void InstanceKlass::set_init_state(ClassState state) {
 
 #if INCLUDE_JVMTI
 
-// RedefineClasses() support for previous versions:
-int InstanceKlass::_previous_version_count = 0;
+// RedefineClasses() support for previous versions
 
-// Purge previous versions before adding new previous versions of the class.
-void InstanceKlass::purge_previous_versions(InstanceKlass* ik) {
-  if (ik->previous_versions() != NULL) {
-    // This klass has previous versions so see what we can cleanup
-    // while it is safe to do so.
+// Globally, there is at least one previous version of a class to walk
+// during class unloading, which is saved because old methods in the class
+// are still running.   Otherwise the previous version list is cleaned up.
+bool InstanceKlass::_has_previous_versions = false;
 
-    int deleted_count = 0;    // leave debugging breadcrumbs
-    int live_count = 0;
-    ClassLoaderData* loader_data = ik->class_loader_data();
-    assert(loader_data != NULL, "should never be null");
+// Returns true if there are previous versions of a class for class
+// unloading only. Also resets the flag to false. purge_previous_version
+// will set the flag to true if there are any left, i.e., if there's any
+// work to do for next time. This is to avoid the expensive code cache
+// walk in CLDG::do_unloading().
+bool InstanceKlass::has_previous_versions_and_reset() {
+  bool ret = _has_previous_versions;
+  log_trace(redefine, class, iklass, purge)("Class unloading: has_previous_versions = %s",
+     ret ? "true" : "false");
+  _has_previous_versions = false;
+  return ret;
+}
 
-    ResourceMark rm;
-    log_trace(redefine, class, iklass, purge)("%s: previous versions", ik->external_name());
+// Purge previous versions before adding new previous versions of the class and
+// during class unloading.
+void InstanceKlass::purge_previous_version_list() {
+  assert(SafepointSynchronize::is_at_safepoint(), "only called at safepoint");
+  assert(has_been_redefined(), "Should only be called for main class");
 
-    // previous versions are linked together through the InstanceKlass
-    InstanceKlass* pv_node = ik->previous_versions();
-    InstanceKlass* last = ik;
-    int version = 0;
+  // Quick exit.
+  if (previous_versions() == NULL) {
+    return;
+  }
 
-    // check the previous versions list
-    for (; pv_node != NULL; ) {
+  // This klass has previous versions so see what we can cleanup
+  // while it is safe to do so.
 
-      ConstantPool* pvcp = pv_node->constants();
-      assert(pvcp != NULL, "cp ref was unexpectedly cleared");
+  int deleted_count = 0;    // leave debugging breadcrumbs
+  int live_count = 0;
+  ClassLoaderData* loader_data = class_loader_data();
+  assert(loader_data != NULL, "should never be null");
 
-      if (!pvcp->on_stack()) {
-        // If the constant pool isn't on stack, none of the methods
-        // are executing.  Unlink this previous_version.
-        // The previous version InstanceKlass is on the ClassLoaderData deallocate list
-        // so will be deallocated during the next phase of class unloading.
-        log_trace(redefine, class, iklass, purge)("previous version " INTPTR_FORMAT " is dead", p2i(pv_node));
-        // For debugging purposes.
-        pv_node->set_is_scratch_class();
-        pv_node->class_loader_data()->add_to_deallocate_list(pv_node);
-        pv_node = pv_node->previous_versions();
-        last->link_previous_versions(pv_node);
-        deleted_count++;
-        version++;
-        continue;
-      } else {
-        log_trace(redefine, class, iklass, purge)("previous version " INTPTR_FORMAT " is alive", p2i(pv_node));
-        assert(pvcp->pool_holder() != NULL, "Constant pool with no holder");
-        guarantee (!loader_data->is_unloading(), "unloaded classes can't be on the stack");
-        live_count++;
-      }
+  ResourceMark rm;
+  log_trace(redefine, class, iklass, purge)("%s: previous versions", external_name());
 
-      // At least one method is live in this previous version.
-      // Reset dead EMCP methods not to get breakpoints.
-      // All methods are deallocated when all of the methods for this class are no
-      // longer running.
-      Array<Method*>* method_refs = pv_node->methods();
-      if (method_refs != NULL) {
-        log_trace(redefine, class, iklass, purge)("previous methods length=%d", method_refs->length());
-        for (int j = 0; j < method_refs->length(); j++) {
-          Method* method = method_refs->at(j);
+  // previous versions are linked together through the InstanceKlass
+  InstanceKlass* pv_node = previous_versions();
+  InstanceKlass* last = this;
+  int version = 0;
 
-          if (!method->on_stack()) {
-            // no breakpoints for non-running methods
-            if (method->is_running_emcp()) {
-              method->set_running_emcp(false);
-            }
-          } else {
-            assert (method->is_obsolete() || method->is_running_emcp(),
-                    "emcp method cannot run after emcp bit is cleared");
-            log_trace(redefine, class, iklass, purge)
-              ("purge: %s(%s): prev method @%d in version @%d is alive",
-               method->name()->as_C_string(), method->signature()->as_C_string(), j, version);
+  // check the previous versions list
+  for (; pv_node != NULL; ) {
+
+    ConstantPool* pvcp = pv_node->constants();
+    assert(pvcp != NULL, "cp ref was unexpectedly cleared");
+
+    if (!pvcp->on_stack()) {
+      // If the constant pool isn't on stack, none of the methods
+      // are executing.  Unlink this previous_version.
+      // The previous version InstanceKlass is on the ClassLoaderData deallocate list
+      // so will be deallocated during the next phase of class unloading.
+      log_trace(redefine, class, iklass, purge)
+        ("previous version " INTPTR_FORMAT " is dead.", p2i(pv_node));
+      // For debugging purposes.
+      pv_node->set_is_scratch_class();
+      // Unlink from previous version list.
+      assert(pv_node->class_loader_data() == loader_data, "wrong loader_data");
+      InstanceKlass* next = pv_node->previous_versions();
+      pv_node->link_previous_versions(NULL);   // point next to NULL
+      last->link_previous_versions(next);
+      // Add to the deallocate list after unlinking
+      loader_data->add_to_deallocate_list(pv_node);
+      pv_node = next;
+      deleted_count++;
+      version++;
+      continue;
+    } else {
+      log_trace(redefine, class, iklass, purge)("previous version " INTPTR_FORMAT " is alive", p2i(pv_node));
+      assert(pvcp->pool_holder() != NULL, "Constant pool with no holder");
+      guarantee (!loader_data->is_unloading(), "unloaded classes can't be on the stack");
+      live_count++;
+      // found a previous version for next time we do class unloading
+      _has_previous_versions = true;
+    }
+
+    // At least one method is live in this previous version.
+    // Reset dead EMCP methods not to get breakpoints.
+    // All methods are deallocated when all of the methods for this class are no
+    // longer running.
+    Array<Method*>* method_refs = pv_node->methods();
+    if (method_refs != NULL) {
+      log_trace(redefine, class, iklass, purge)("previous methods length=%d", method_refs->length());
+      for (int j = 0; j < method_refs->length(); j++) {
+        Method* method = method_refs->at(j);
+
+        if (!method->on_stack()) {
+          // no breakpoints for non-running methods
+          if (method->is_running_emcp()) {
+            method->set_running_emcp(false);
           }
+        } else {
+          assert (method->is_obsolete() || method->is_running_emcp(),
+                  "emcp method cannot run after emcp bit is cleared");
+          log_trace(redefine, class, iklass, purge)
+            ("purge: %s(%s): prev method @%d in version @%d is alive",
+             method->name()->as_C_string(), method->signature()->as_C_string(), j, version);
         }
       }
-      // next previous version
-      last = pv_node;
-      pv_node = pv_node->previous_versions();
-      version++;
     }
-    log_trace(redefine, class, iklass, purge)
-      ("previous version stats: live=%d, deleted=%d",
-       live_count, deleted_count);
+    // next previous version
+    last = pv_node;
+    pv_node = pv_node->previous_versions();
+    version++;
   }
+  log_trace(redefine, class, iklass, purge)
+    ("previous version stats: live=%d, deleted=%d", live_count, deleted_count);
 }
 
 void InstanceKlass::mark_newly_obsolete_methods(Array<Method*>* old_methods,
@@ -3516,8 +3544,8 @@ void InstanceKlass::add_previous_version(instanceKlassHandle scratch_class,
   log_trace(redefine, class, iklass, add)
     ("adding previous version ref for %s, EMCP_cnt=%d", scratch_class->external_name(), emcp_method_count);
 
-  // Clean out old previous versions
-  purge_previous_versions(this);
+  // Clean out old previous versions for this class
+  purge_previous_version_list();
 
   // Mark newly obsolete methods in remaining previous versions.  An EMCP method from
   // a previous redefinition may be made obsolete by this redefinition.
@@ -3534,8 +3562,6 @@ void InstanceKlass::add_previous_version(instanceKlassHandle scratch_class,
     // For debugging purposes.
     scratch_class->set_is_scratch_class();
     scratch_class->class_loader_data()->add_to_deallocate_list(scratch_class());
-    // Update count for class unloading.
-    _previous_version_count--;
     return;
   }
 
@@ -3563,12 +3589,12 @@ void InstanceKlass::add_previous_version(instanceKlassHandle scratch_class,
   }
 
   // Add previous version if any methods are still running.
-  log_trace(redefine, class, iklass, add)("scratch class added; one of its methods is on_stack");
+  // Set has_previous_version flag for processing during class unloading.
+  _has_previous_versions = true;
+  log_trace(redefine, class, iklass, add) ("scratch class added; one of its methods is on_stack.");
   assert(scratch_class->previous_versions() == NULL, "shouldn't have a previous version");
   scratch_class->link_previous_versions(previous_versions());
   link_previous_versions(scratch_class());
-  // Update count for class unloading.
-  _previous_version_count++;
 } // end add_previous_version()
 
 #endif // INCLUDE_JVMTI
@@ -3622,6 +3648,15 @@ Method* InstanceKlass::method_with_orig_idnum(int idnum, int version) {
 }
 
 #if INCLUDE_JVMTI
+JvmtiCachedClassFileData* InstanceKlass::get_cached_class_file() {
+  if (MetaspaceShared::is_in_shared_space(_cached_class_file)) {
+    // Ignore the archived class stream data
+    return NULL;
+  } else {
+    return _cached_class_file;
+  }
+}
+
 jint InstanceKlass::get_cached_class_file_len() {
   return VM_RedefineClasses::get_cached_class_file_len(_cached_class_file);
 }
@@ -3629,4 +3664,15 @@ jint InstanceKlass::get_cached_class_file_len() {
 unsigned char * InstanceKlass::get_cached_class_file_bytes() {
   return VM_RedefineClasses::get_cached_class_file_bytes(_cached_class_file);
 }
+
+#if INCLUDE_CDS
+JvmtiCachedClassFileData* InstanceKlass::get_archived_class_data() {
+  assert(this->is_shared(), "class should be shared");
+  if (MetaspaceShared::is_in_shared_space(_cached_class_file)) {
+    return _cached_class_file;
+  } else {
+    return NULL;
+  }
+}
+#endif
 #endif

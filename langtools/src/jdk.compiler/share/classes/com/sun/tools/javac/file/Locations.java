@@ -78,8 +78,10 @@ import com.sun.tools.javac.resources.CompilerProperties.Errors;
 import com.sun.tools.javac.resources.CompilerProperties.Warnings;
 import com.sun.tools.javac.util.DefinedBy;
 import com.sun.tools.javac.util.DefinedBy.Api;
+import com.sun.tools.javac.util.JDK9Wrappers;
 import com.sun.tools.javac.util.ListBuffer;
 import com.sun.tools.javac.util.Log;
+import com.sun.tools.javac.jvm.ModuleNameReader;
 import com.sun.tools.javac.util.Pair;
 import com.sun.tools.javac.util.StringUtils;
 
@@ -130,6 +132,7 @@ public class Locations {
 
     Map<Path, FileSystem> fileSystems = new LinkedHashMap<>();
     List<Closeable> closeables = new ArrayList<>();
+    private Map<String,String> fsEnv = Collections.emptyMap();
 
     Locations() {
         initHandlers();
@@ -205,6 +208,10 @@ public class Locations {
             }
         }
         return entries;
+    }
+
+    public void setMultiReleaseValue(String multiReleaseValue) {
+        fsEnv = Collections.singletonMap("multi-release", multiReleaseValue);
     }
 
     /**
@@ -1047,7 +1054,8 @@ public class Locations {
                 }
 
                 if (p.getFileName().toString().endsWith(".jar") && fsInfo.exists(p)) {
-                    try (FileSystem fs = FileSystems.newFileSystem(p, null)) {
+                    URI uri = URI.create("jar:" + p.toUri());
+                    try (FileSystem fs = FileSystems.newFileSystem(uri, fsEnv, null)) {
                         Path moduleInfoClass = fs.getPath("module-info.class");
                         if (Files.exists(moduleInfoClass)) {
                             String moduleName = readModuleName(moduleInfoClass);
@@ -1096,6 +1104,11 @@ public class Locations {
 
                 if (p.getFileName().toString().endsWith(".jmod")) {
                     try {
+                        // check if the JMOD file is valid
+                        JDK9Wrappers.JmodFile.checkMagic(p);
+
+                        // No JMOD file system.  Use JarFileSystem to
+                        // workaround for now
                         FileSystem fs = fileSystems.get(p);
                         if (fs == null) {
                             URI uri = URI.create("jar:" + p.toUri());

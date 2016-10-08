@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,11 +27,11 @@
  * @bug 8031320
  * @summary Verify PrintPreciseRTMLockingStatistics on CPUs with
  *          rtm support and on VM with rtm locking support,
- * @library /testlibrary /test/lib /
+ * @library /test/lib /
  * @modules java.base/jdk.internal.misc
  *          java.management
  *
- * @build compiler.rtm.cli.TestPrintPreciseRTMLockingStatisticsOptionOnSupportedConfig
+ * @build sun.hotspot.WhiteBox
  * @run driver ClassFileInstaller sun.hotspot.WhiteBox
  *                                sun.hotspot.WhiteBox$WhiteBoxPermission
  * @run main/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions
@@ -42,6 +42,7 @@
 package compiler.rtm.cli;
 
 import compiler.testlibrary.rtm.predicate.SupportedCPU;
+import compiler.testlibrary.rtm.predicate.SupportedOS;
 import compiler.testlibrary.rtm.predicate.SupportedVM;
 import jdk.test.lib.cli.CommandLineOptionTest;
 import jdk.test.lib.cli.predicate.AndPredicate;
@@ -49,7 +50,7 @@ import jdk.test.lib.cli.predicate.AndPredicate;
 public class TestPrintPreciseRTMLockingStatisticsOptionOnSupportedConfig
         extends TestPrintPreciseRTMLockingStatisticsBase {
     private TestPrintPreciseRTMLockingStatisticsOptionOnSupportedConfig() {
-        super(new AndPredicate(new SupportedVM(), new SupportedCPU()));
+        super(new AndPredicate(new SupportedCPU(), new SupportedOS(), new SupportedVM()));
     }
 
     @Override

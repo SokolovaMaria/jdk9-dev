@@ -1353,7 +1353,12 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   __ stlrw(rscratch1, rscratch2);
 
   // reset_last_Java_frame
-  __ reset_last_Java_frame(true, true);
+  __ reset_last_Java_frame(true);
+
+  if (CheckJNICalls) {
+    // clear_pending_jni_exception_check
+    __ str(zr, Address(rthread, JavaThread::pending_jni_exception_check_fn_offset()));
+  }
 
   // reset handle block
   __ ldr(t, Address(rthread, JavaThread::active_handles_offset()));

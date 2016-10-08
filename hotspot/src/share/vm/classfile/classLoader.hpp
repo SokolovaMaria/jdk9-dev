@@ -50,12 +50,14 @@ class ClassFileStream;
 
 class ClassPathEntry : public CHeapObj<mtClass> {
 private:
-  ClassPathEntry* _next;
+  ClassPathEntry* volatile _next;
 public:
   // Next entry in class path
-  ClassPathEntry* next() const { return _next; }
+  ClassPathEntry* next() const {
+    return (ClassPathEntry*) OrderAccess::load_ptr_acquire(&_next);
+  }
   void set_next(ClassPathEntry* next) {
-    // may have unlocked readers, so write atomically.
+    // may have unlocked readers, so ensure visibility.
     OrderAccess::release_store_ptr(&_next, next);
   }
   virtual bool is_jrt() = 0;
@@ -67,6 +69,7 @@ public:
   // Attempt to locate file_name through this class path entry.
   // Returns a class file parsing stream if successfull.
   virtual ClassFileStream* open_stream(const char* name, TRAPS) = 0;
+  virtual bool stream_exists(const char* name) = 0;
   // Debugging
   NOT_PRODUCT(virtual void compile_the_world(Handle loader, TRAPS) = 0;)
 };
@@ -81,6 +84,7 @@ class ClassPathDirEntry: public ClassPathEntry {
   JImageFile* jimage() const { return NULL; }
   ClassPathDirEntry(const char* dir);
   ClassFileStream* open_stream(const char* name, TRAPS);
+  bool stream_exists(const char* name) { return false; }
   // Debugging
   NOT_PRODUCT(void compile_the_world(Handle loader, TRAPS);)
 };
@@ -124,6 +128,7 @@ class ClassPathZipEntry: public ClassPathEntry {
   ClassFileStream* open_stream(const char* name, TRAPS);
   void contents_do(void f(const char* name, void* context), void* context);
   bool is_multiple_versioned(TRAPS) NOT_CDS_RETURN_(false);
+  bool stream_exists(const char* name);
   // Debugging
   NOT_PRODUCT(void compile_the_world(Handle loader, TRAPS);)
 };
@@ -143,6 +148,7 @@ public:
   ClassPathImageEntry(JImageFile* jimage, const char* name);
   ~ClassPathImageEntry();
   ClassFileStream* open_stream(const char* name, TRAPS);
+  bool stream_exists(const char* name) { return false; }
 
   // Debugging
   NOT_PRODUCT(void compile_the_world(Handle loader, TRAPS);)
@@ -253,6 +259,7 @@ class ClassLoader: AllStatic {
 
   // Info used by CDS
   CDS_ONLY(static SharedPathsMiscInfo * _shared_paths_misc_info;)
+  CDS_ONLY(static int _num_patch_mod_prefixes;)
 
   // Initialization:
   //   - setup the boot loader's system class path
@@ -425,6 +432,9 @@ class ClassLoader: AllStatic {
   static void initialize_module_loader_map(JImageFile* jimage);
   static s2 classloader_type(Symbol* class_name, ClassPathEntry* e,
                              int classpath_index, TRAPS);
+  static bool is_in_patch_module(const char* const file_name);
+  static void setup_patch_mod_path(); // Only when -Xshare:dump
+  static int num_patch_mod_prefixes() { return _num_patch_mod_prefixes; }
 #endif
 
   static void  trace_class_path(const char* msg, const char* name = NULL);

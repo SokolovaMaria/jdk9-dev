@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @library /test/lib/share/classes
+ * @library /test/lib
  * @modules java.base/jdk.internal.misc
  * @build jdk.test.lib.JDKToolFinder jdk.test.lib.Platform
  * @run testng Basic
@@ -194,6 +194,8 @@ public class Basic {
                 "META-INF/versions/9/version/Version.class",
                 new String[] {"v10", "version", "Version.class"}
         );
+
+        compare(jarfile, names);
 
         delete(jarfile);
         deleteDir(Paths.get(usr, "classes"));

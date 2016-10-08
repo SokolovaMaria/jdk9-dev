@@ -425,8 +425,7 @@ public enum Option {
     J("-J", "opt.arg.flag", "opt.J", STANDARD, INFO, ArgKind.ADJACENT) {
         @Override
         public boolean process(OptionHelper helper, String option) {
-            throw new AssertionError
-                ("the -J flag should be caught by the launcher.");
+            throw new AssertionError("the -J flag should be caught by the launcher.");
         }
     },
 
@@ -509,33 +508,21 @@ public enum Option {
 
     XDIAGS("-Xdiags:", "opt.diags", EXTENDED, BASIC, ONEOF, "compact", "verbose"),
 
-    XDEBUG("-Xdebug:", null, HIDDEN, BASIC) {
+    DEBUG("--debug:", null, HIDDEN, BASIC) {
         @Override
         public boolean process(OptionHelper helper, String option) {
-            String p = option.substring(option.indexOf(':') + 1).trim();
-            String[] subOptions = p.split(";");
-            for (String subOption : subOptions) {
-                subOption = "debug." + subOption.trim();
-                XD.process(helper, subOption, subOption);
-            }
-            return false;
+            return HiddenGroup.DEBUG.process(helper, option);
         }
     },
 
-    XSHOULDSTOP("-Xshouldstop:", null, HIDDEN, BASIC) {
+    SHOULDSTOP("--should-stop:", null, HIDDEN, BASIC) {
         @Override
         public boolean process(OptionHelper helper, String option) {
-            String p = option.substring(option.indexOf(':') + 1).trim();
-            String[] subOptions = p.split(";");
-            for (String subOption : subOptions) {
-                subOption = "shouldstop." + subOption.trim();
-                XD.process(helper, subOption, subOption);
-            }
-            return false;
+            return HiddenGroup.SHOULDSTOP.process(helper, option);
         }
     },
 
-    DIAGS("-diags:", null, HIDDEN, BASIC) {
+    DIAGS("--diags:", null, HIDDEN, BASIC) {
         @Override
         public boolean process(OptionHelper helper, String option) {
             return HiddenGroup.DIAGS.process(helper, option);
@@ -703,7 +690,7 @@ public enum Option {
          * This option takes an argument.
          * If the name of option ends with ':' or '=', the argument must be provided directly
          * after that separator.
-         * Otherwise, if may appear after an '=' or in the following argument position.
+         * Otherwise, it may appear after an '=' or in the following argument position.
          */
         REQUIRED,
 
@@ -754,7 +741,12 @@ public enum Option {
     }
 
     enum HiddenGroup {
-        DIAGS("diags");
+        DIAGS("diags"),
+        DEBUG("debug"),
+        SHOULDSTOP("should-stop");
+
+        static final Set<String> skipSet = new java.util.HashSet<>(
+                Arrays.asList("--diags:", "--debug:", "--should-stop:"));
 
         final String text;
 
@@ -770,6 +762,10 @@ public enum Option {
                 XD.process(helper, subOption, subOption);
             }
             return false;
+        }
+
+        static boolean skip(String name) {
+            return skipSet.contains(name);
         }
     }
 
@@ -930,7 +926,7 @@ public enum Option {
     }
 
     private boolean matches(String option, String name) {
-        if (name.startsWith("--")) {
+        if (name.startsWith("--") && !HiddenGroup.skip(name)) {
             return option.equals(name)
                     || hasArg() && option.startsWith(name + "=");
         }

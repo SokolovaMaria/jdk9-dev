@@ -378,7 +378,9 @@ bool os::Bsd::get_frame_at_stack_banging_point(JavaThread* thread, ucontext_t* u
     // method returns the Java sender of the current frame.
     *fr = os::fetch_frame_from_ucontext(thread, uc);
     if (!fr->is_first_java_frame()) {
-      assert(fr->safe_for_sender(thread), "Safety check");
+      // get_frame_at_stack_banging_point() is only called when we
+      // have well defined stacks so java_sender() calls do not need
+      // to assert safe_for_sender() first.
       *fr = fr->java_sender();
     }
   } else {
@@ -395,7 +397,7 @@ bool os::Bsd::get_frame_at_stack_banging_point(JavaThread* thread, ucontext_t* u
       // has been pushed on the stack
       *fr = frame(fr->sp() + 1, fr->fp(), (address)*(fr->sp()));
       if (!fr->is_java_frame()) {
-        assert(fr->safe_for_sender(thread), "Safety check");
+        // See java_sender() comment above.
         *fr = fr->java_sender();
       }
     }
@@ -838,9 +840,13 @@ bool os::is_allocatable(size_t bytes) {
 // thread stack
 
 #ifdef AMD64
-size_t os::Bsd::min_stack_allowed  = 64 * K;
+size_t os::Posix::_compiler_thread_min_stack_allowed = 64 * K;
+size_t os::Posix::_java_thread_min_stack_allowed = 64 * K;
+size_t os::Posix::_vm_internal_thread_min_stack_allowed = 64 * K;
 #else
-size_t os::Bsd::min_stack_allowed  =  (48 DEBUG_ONLY(+4))*K;
+size_t os::Posix::_compiler_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
+size_t os::Posix::_java_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
+size_t os::Posix::_vm_internal_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
 
 #ifdef __GNUC__
 #define GET_GS() ({int gs; __asm__ volatile("movw %%gs, %w0":"=q"(gs)); gs&0xffff;})
@@ -849,7 +855,7 @@ size_t os::Bsd::min_stack_allowed  =  (48 DEBUG_ONLY(+4))*K;
 #endif // AMD64
 
 // return default stack size for thr_type
-size_t os::Bsd::default_stack_size(os::ThreadType thr_type) {
+size_t os::Posix::default_stack_size(os::ThreadType thr_type) {
   // default stack size (compiler thread needs larger stack)
 #ifdef AMD64
   size_t s = (thr_type == os::compiler_thread ? 4 * M : 1 * M);
@@ -859,11 +865,6 @@ size_t os::Bsd::default_stack_size(os::ThreadType thr_type) {
   return s;
 }
 
-size_t os::Bsd::default_guard_size(os::ThreadType thr_type) {
-  // Creating guard page is very expensive. Java thread has HotSpot
-  // guard page, only enable glibc guard page for non-Java threads.
-  return (thr_type == java_thread ? 0 : page_size());
-}
 
 // Java thread:
 //

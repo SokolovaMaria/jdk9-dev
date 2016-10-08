@@ -38,7 +38,7 @@
 #include "oops/oop.inline.hpp"
 #include "prims/privilegedStack.hpp"
 #include "runtime/arguments.hpp"
-#include "runtime/atomic.inline.hpp"
+#include "runtime/atomic.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/java.hpp"
 #include "runtime/os.hpp"
@@ -282,6 +282,12 @@ void report_untested(const char* file, int line, const char* message) {
 }
 
 void report_out_of_shared_space(SharedSpaceType shared_space) {
+  if (shared_space == SharedOptional) {
+    // The estimated shared_optional_space size is large enough
+    // for all class bytes.  It should not run out of space.
+    ShouldNotReachHere();
+  }
+
   static const char* name[] = {
     "shared read only space",
     "shared read write space",

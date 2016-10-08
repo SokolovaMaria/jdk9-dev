@@ -26,8 +26,7 @@ package jdk.vm.ci.hotspot;
 import static jdk.vm.ci.common.InitTimer.timer;
 import static jdk.vm.ci.hotspot.HotSpotJVMCIRuntime.runtime;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
+import java.lang.reflect.Executable;
 
 import jdk.vm.ci.code.BytecodeFrame;
 import jdk.vm.ci.code.InstalledCode;
@@ -244,15 +243,19 @@ final class CompilerToVM {
     native void resolveInvokeDynamicInPool(HotSpotConstantPool constantPool, int cpi);
 
     /**
-     * Ensures that the type referenced by the entry for a
+     * If {@code cpi} denotes an entry representing a
      * <a href="https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-2.html#jvms-2.9">signature
-     * polymorphic</a> method at index {@code cpi} in {@code constantPool} is loaded and
-     * initialized.
-     *
-     * The behavior of this method is undefined if {@code cpi} does not denote an entry representing
-     * a signature polymorphic method.
+     * polymorphic</a> method, this method ensures that the type referenced by the entry is loaded
+     * and initialized. It {@code cpi} does not denote a signature polymorphic method, this method
+     * does nothing.
      */
     native void resolveInvokeHandleInPool(HotSpotConstantPool constantPool, int cpi);
+
+    /**
+     * Gets the list of type names (in the format of {@link JavaType#getName()}) denoting the
+     * classes that define signature polymorphic methods.
+     */
+    native String[] getSignaturePolymorphicHolders();
 
     /**
      * Gets the resolved type denoted by the entry at index {@code cpi} in {@code constantPool}.
@@ -348,6 +351,7 @@ final class CompilerToVM {
      *         [String name, Long value, ...] vmConstants,
      *         [String name, Long value, ...] vmAddresses,
      *         VMFlag[] vmFlags
+     *         VMIntrinsicMethod[] vmIntrinsics
      *     ]
      * </pre>
      *
@@ -361,8 +365,8 @@ final class CompilerToVM {
      * {@code exactReceiver}.
      *
      * @param caller the caller or context type used to perform access checks
-     * @return the link-time resolved method (might be abstract) or {@code 0} if it can not be
-     *         linked
+     * @return the link-time resolved method (might be abstract) or {@code null} if it is either a
+     *         signature polymorphic method or can not be linked.
      */
     native HotSpotResolvedJavaMethodImpl resolveMethod(HotSpotResolvedObjectTypeImpl exactReceiver, HotSpotResolvedJavaMethodImpl method, HotSpotResolvedObjectTypeImpl caller);
 
@@ -380,10 +384,9 @@ final class CompilerToVM {
     native boolean hasFinalizableSubclass(HotSpotResolvedObjectTypeImpl type);
 
     /**
-     * Gets the method corresponding to {@code holder} and slot number {@code slot} (i.e.
-     * {@link Method#slot} or {@link Constructor#slot}).
+     * Gets the method corresponding to {@code executable}.
      */
-    native HotSpotResolvedJavaMethodImpl getResolvedJavaMethodAtSlot(Class<?> holder, int slot);
+    native HotSpotResolvedJavaMethodImpl asResolvedJavaMethod(Executable executable);
 
     /**
      * Gets the maximum absolute offset of a PC relative call to {@code address} from any position
@@ -610,4 +613,10 @@ final class CompilerToVM {
      * @return the number of bytes required for deoptimization of this frame state
      */
     native int interpreterFrameSize(BytecodeFrame frame);
+
+    /**
+     * Invokes non-public method {@code java.lang.invoke.LambdaForm.compileToBytecode()} on
+     * {@code lambdaForm} (which must be a {@code java.lang.invoke.LambdaForm} instance).
+     */
+    native void compileToBytecode(Object lambdaForm);
 }

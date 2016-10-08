@@ -752,8 +752,7 @@ void MacroAssembler::pushptr(AddressLiteral src) {
   }
 }
 
-void MacroAssembler::reset_last_Java_frame(bool clear_fp,
-                                           bool clear_pc) {
+void MacroAssembler::reset_last_Java_frame(bool clear_fp) {
   // we must set sp to zero to clear frame
   movptr(Address(r15_thread, JavaThread::last_Java_sp_offset()), NULL_WORD);
   // must clear fp, so that compiled frames are not confused; it is
@@ -762,9 +761,8 @@ void MacroAssembler::reset_last_Java_frame(bool clear_fp,
     movptr(Address(r15_thread, JavaThread::last_Java_fp_offset()), NULL_WORD);
   }
 
-  if (clear_pc) {
-    movptr(Address(r15_thread, JavaThread::last_Java_pc_offset()), NULL_WORD);
-  }
+  // Always clear the pc because it could have been set by make_walkable()
+  movptr(Address(r15_thread, JavaThread::last_Java_pc_offset()), NULL_WORD);
 }
 
 void MacroAssembler::set_last_Java_frame(Register last_java_sp,
@@ -2531,7 +2529,7 @@ void MacroAssembler::call_VM_base(Register oop_result,
   }
   // reset last Java frame
   // Only interpreter should have to clear fp
-  reset_last_Java_frame(java_thread, true, false);
+  reset_last_Java_frame(java_thread, true);
 
    // C++ interp handles this in the interpreter
   check_and_handle_popframe(java_thread);
@@ -3149,6 +3147,24 @@ void MacroAssembler::fremr(Register tmp) {
   fpop();
 }
 
+// dst = c = a * b + c
+void MacroAssembler::fmad(XMMRegister dst, XMMRegister a, XMMRegister b, XMMRegister c) {
+  Assembler::vfmadd231sd(c, a, b);
+  if (dst != c) {
+    movdbl(dst, c);
+  }
+}
+
+// dst = c = a * b + c
+void MacroAssembler::fmaf(XMMRegister dst, XMMRegister a, XMMRegister b, XMMRegister c) {
+  Assembler::vfmadd231ss(c, a, b);
+  if (dst != c) {
+    movflt(dst, c);
+  }
+}
+
+
+
 
 void MacroAssembler::incrementl(AddressLiteral dst) {
   if (reachable(dst)) {
@@ -3642,8 +3658,7 @@ void MacroAssembler::push_IU_state() {
   pusha();
 }
 
-void MacroAssembler::reset_last_Java_frame(Register java_thread, bool clear_fp, bool clear_pc) {
-  // determine java_thread register
+void MacroAssembler::reset_last_Java_frame(Register java_thread, bool clear_fp) { // determine java_thread register
   if (!java_thread->is_valid()) {
     java_thread = rdi;
     get_thread(java_thread);
@@ -3654,8 +3669,8 @@ void MacroAssembler::reset_last_Java_frame(Register java_thread, bool clear_fp, 
     movptr(Address(java_thread, JavaThread::last_Java_fp_offset()), NULL_WORD);
   }
 
-  if (clear_pc)
-    movptr(Address(java_thread, JavaThread::last_Java_pc_offset()), NULL_WORD);
+  // Always clear the pc because it could have been set by make_walkable()
+  movptr(Address(java_thread, JavaThread::last_Java_pc_offset()), NULL_WORD);
 
 }
 
@@ -8134,8 +8149,7 @@ void MacroAssembler::has_negatives(Register ary1, Register len,
     jmp(FALSE_LABEL);
 
     clear_vector_masking();   // closing of the stub context for programming mask registers
-  }
-  else {
+  } else {
     movl(result, len); // copy
 
     if (UseAVX == 2 && UseSSE >= 2) {
@@ -8172,8 +8186,7 @@ void MacroAssembler::has_negatives(Register ary1, Register len,
       bind(COMPARE_TAIL); // len is zero
       movl(len, result);
       // Fallthru to tail compare
-    }
-    else if (UseSSE42Intrinsics) {
+    } else if (UseSSE42Intrinsics) {
       // With SSE4.2, use double quad vector compare
       Label COMPARE_WIDE_VECTORS, COMPARE_TAIL;
 
@@ -10751,7 +10764,10 @@ void MacroAssembler::char_array_compress(Register src, Register dst, Register le
   // save length for return
   push(len);
 
+  // 8165287: EVEX version disabled for now, needs to be refactored as
+  // it is returning incorrect results.
   if ((UseAVX > 2) && // AVX512
+    0 &&
     VM_Version::supports_avx512vlbw() &&
     VM_Version::supports_bmi2()) {
 
@@ -11070,10 +11086,11 @@ void MacroAssembler::byte_array_inflate(Register src, Register dst, Register len
 
       bind(below_threshold);
       bind(copy_new_tail);
-      if (UseAVX > 2) {
+      if ((UseAVX > 2) &&
+        VM_Version::supports_avx512vlbw() &&
+        VM_Version::supports_bmi2()) {
         movl(tmp2, len);
-      }
-      else {
+      } else {
         movl(len, tmp2);
       }
       andl(tmp2, 0x00000007);
