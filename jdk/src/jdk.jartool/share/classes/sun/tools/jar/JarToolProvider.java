@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,11 +23,18 @@
  * questions.
  */
 
-package jdk.dynalink.test;
+package sun.tools.jar;
 
-/**
- * Exception used to signal to the test method that the control has reached auto loaded
- * dynamic linker.
- */
-public final class ReachedAutoLoadedDynamicLinkerException extends RuntimeException {
+import java.io.PrintWriter;
+import java.util.spi.ToolProvider;
+
+public class JarToolProvider implements ToolProvider {
+    public String name() {
+        return "jar";
+    }
+
+    public int run(PrintWriter out, PrintWriter err, String... args) {
+        boolean ok = new Main(out, err, name()).run(args);
+        return ok ? 0 : 1;
+    }
 }
