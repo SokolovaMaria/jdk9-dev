@@ -4,7 +4,9 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -20,28 +22,21 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+package jdk.tools.jlink.internal;
 
-/*
- * @test
- * @summary Test JlinkPermission
- * @author Jean-Francois Denise
- * @modules jdk.jlink/jdk.tools.jlink.internal
- * @run main/othervm SecurityTest
+import java.security.BasicPermission;
+
+/**
+ * The permission required to use jlink API. The permission target_name is
+ * "jlink". e.g.: permission jdk.tools.jlink.plugins.JlinkPermission "jlink";
+ *
  */
+public final class JlinkPermission extends BasicPermission {
 
-import java.security.AccessControlException;
-import jdk.tools.jlink.internal.Jlink;
+    private static final long serialVersionUID = -3687912306077727801L;
 
-public class SecurityTest {
-
-    public static void main(String[] args) throws Exception {
-        new Jlink();
-        System.setSecurityManager(new SecurityManager());
-        try {
-            new Jlink();
-            throw new Exception("Call should have failed");
-        } catch (AccessControlException ex) {
-            // expected exception
-        }
+    public JlinkPermission(String name) {
+        super(name);
     }
+
 }
