@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,7 +23,7 @@
  * questions.
  */
 
-package jdk.internal.jshell.tool;
+package jdk.internal.editor.external;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -47,22 +47,55 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 public class ExternalEditor {
     private final Consumer<String> errorHandler;
     private final Consumer<String> saveHandler;
-    private final Consumer<String> printHandler;
-    private final IOContext input;
     private final boolean wait;
+
+    private final Runnable suspendInteractiveInput;
+    private final Runnable resumeInteractiveInput;
+    private final Runnable promptForNewLineToEndWait;
 
     private WatchService watcher;
     private Thread watchedThread;
     private Path dir;
     private Path tmpfile;
 
-    ExternalEditor(Consumer<String> errorHandler, Consumer<String> saveHandler,
-            IOContext input, boolean wait, Consumer<String> printHandler) {
+    /**
+     * Launch an external editor.
+     *
+     * @param cmd the command to launch (with parameters)
+     * @param initialText initial text in the editor buffer
+     * @param errorHandler handler for error messages
+     * @param saveHandler handler sent the buffer contents on save
+     * @param suspendInteractiveInput a callback to suspend caller (shell) input
+     * @param resumeInteractiveInput a callback to resume caller input
+     * @param wait true, if editor process termination cannot be used to
+     * determine when done
+     * @param promptForNewLineToEndWait a callback to prompt for newline if
+     * wait==true
+     */
+    public static void edit(String[] cmd, String initialText,
+            Consumer<String> errorHandler,
+            Consumer<String> saveHandler,
+            Runnable suspendInteractiveInput,
+            Runnable resumeInteractiveInput,
+            boolean wait,
+            Runnable promptForNewLineToEndWait) {
+        ExternalEditor ed = new ExternalEditor(errorHandler, saveHandler, suspendInteractiveInput,
+             resumeInteractiveInput, wait, promptForNewLineToEndWait);
+        ed.edit(cmd, initialText);
+    }
+
+    ExternalEditor(Consumer<String> errorHandler,
+            Consumer<String> saveHandler,
+            Runnable suspendInteractiveInput,
+            Runnable resumeInteractiveInput,
+            boolean wait,
+            Runnable promptForNewLineToEndWait) {
         this.errorHandler = errorHandler;
         this.saveHandler = saveHandler;
-        this.printHandler = printHandler;
-        this.input = input;
         this.wait = wait;
+        this.suspendInteractiveInput = suspendInteractiveInput;
+        this.resumeInteractiveInput = resumeInteractiveInput;
+        this.promptForNewLineToEndWait = promptForNewLineToEndWait;
     }
 
     private void edit(String[] cmd, String initialText) {
@@ -79,7 +112,7 @@ public class ExternalEditor {
      */
     private void setupWatch(String initialText) throws IOException {
         this.watcher = FileSystems.getDefault().newWatchService();
-        this.dir = Files.createTempDirectory("jshelltemp");
+        this.dir = Files.createTempDirectory("extedit");
         this.tmpfile = Files.createTempFile(dir, null, ".java");
         Files.write(tmpfile, initialText.getBytes(Charset.forName("UTF-8")));
         dir.register(watcher,
@@ -100,12 +133,7 @@ public class ExternalEditor {
                 }
 
                 if (!key.pollEvents().isEmpty()) {
-                    // Changes have occurred in temp edit directory,
-                    // transfer the new sources to JShell (unless the editor is
-                    // running directly in JShell's window -- don't make a mess)
-                    if (!input.terminalEditorRunning()) {
-                        saveFile();
-                    }
+                    saveFile();
                 }
 
                 boolean valid = key.reset();
@@ -125,13 +153,13 @@ public class ExternalEditor {
         pb = pb.inheritIO();
 
         try {
-            input.suspend();
+            suspendInteractiveInput.run();
             Process process = pb.start();
             // wait to exit edit mode in one of these ways...
             if (wait) {
                 // -wait option -- ignore process exit, wait for carriage-return
                 Scanner scanner = new Scanner(System.in);
-                printHandler.accept("jshell.msg.press.return.to.leave.edit.mode");
+                promptForNewLineToEndWait.run();
                 scanner.nextLine();
             } else {
                 // wait for process to exit
@@ -149,7 +177,7 @@ public class ExternalEditor {
             } catch (InterruptedException ex) {
                 errorHandler.accept("process interrupt: " + ex.getMessage());
             } finally {
-                input.resume();
+                resumeInteractiveInput.run();
             }
         }
     }
@@ -160,11 +188,5 @@ public class ExternalEditor {
         } catch (IOException ex) {
             errorHandler.accept("Failure in read edit file: " + ex.getMessage());
         }
-    }
-
-    static void edit(String[] cmd, Consumer<String> errorHandler, String initialText,
-            Consumer<String> saveHandler, IOContext input, boolean wait, Consumer<String> printHandler) {
-        ExternalEditor ed = new ExternalEditor(errorHandler, saveHandler, input, wait, printHandler);
-        ed.edit(cmd, initialText);
     }
 }
