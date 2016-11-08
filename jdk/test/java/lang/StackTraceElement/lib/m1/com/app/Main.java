@@ -21,8 +21,18 @@
  * questions.
  */
 
-package p1;
+package com.app;
 
-public class C1 {
-    public class InnerDefinition {}
+import java.lang.StackWalker.StackFrame;
+
+public class Main {
+    public static void main(String... args) throws Exception {
+        StackFrame frame = Utils.makeStackFrame(Main.class, "main", "Main.java");
+        Utils.checkFrame("app", frame, caller());
+    }
+
+    private static StackTraceElement caller() {
+        StackTraceElement[] stes = Thread.currentThread().getStackTrace();
+        return stes[2];
+    }
 }

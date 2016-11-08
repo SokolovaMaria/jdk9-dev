@@ -21,7 +21,6 @@
  * questions.
  */
 
-module m {
-    provides p1.C1.InnerDefinition with p2.C2;
-    exports p1;
+module m1 {
+    exports com.app;
 }

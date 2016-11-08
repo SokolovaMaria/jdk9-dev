@@ -4,7 +4,9 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -21,26 +23,12 @@
  * questions.
  */
 
-/*
- * @test
- * @bug 8164518
- * @summary Tests for standard JDI connector (without failover) -- launching
- * @modules jdk.jshell/jdk.jshell.execution
- * @build KullaTesting ExecutionControlTestBase
- * @run testng JDILaunchingExecutionControlTest
- */
+package pack1;
 
-
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeMethod;
-import jdk.jshell.execution.JDIDefaultExecutionControl;
-
-@Test
-public class JDILaunchingExecutionControlTest extends ExecutionControlTestBase {
-
-    @BeforeMethod
-    @Override
-    public void setUp() {
-        setUp(builder -> builder.executionEngine(JDIDefaultExecutionControl.launch()));
+public class Outer1 {
+    public static class Implem extends Outer.Inter {
+        public Implem () {
+            new Outer().super();
+        }
     }
 }
