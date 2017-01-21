@@ -2,4 +2,3 @@
 .hgignore
 CMakeLists.txt
 build/
-*.out
